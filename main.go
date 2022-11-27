@@ -44,3 +44,30 @@ func Bank(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
+	// In this section, we want to send a request to Zarin Pal and get permission to use this port.
+// zarinpal is an object
+// merchandID is The ID that the portal gives us for identification operations
+// it must be 36 character
+// The sandbox is designed for the developer to check payment operations while developing the app. 
+//By default, we set it to be correct so that we can test our port without exchanging any money.
+
+zarinpal, err := zarinpal.NewZarinpal(MERCHAND_ID, SANDBOX)
+// error in here means we have a problem to connection and We have not been able to connect to Zarin Pal for any reason.
+
+if err != nil {
+	fmt.Fprintln(w, "خطا در پرداخت.")
+	w.WriteHeader(http.StatusInternalServerError)
+	return
+}
+
+
+
+
+intPrice, err := strconv.Atoi(price)
+if err != nil {
+	// The error here is for when the user cannot enter the amount correctly, which requires error handling.
+	fmt.Fprintln(w, "لطفا مبلغ را بصورت عدد وارد کنید.")
+	w.WriteHeader(http.StatusBadRequest)
+	return
+}
