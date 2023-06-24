@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/sinabakh/go-zarinpal-checkout"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/gorilla/mux"
 )
@@ -16,15 +17,17 @@ import (
 // add feature
 
 const (
-	SERVER_PORT = ":8383"
-	MERCHAND_ID = "111111222222333333444444555555666666" // sellerport
-	SANDBOX     = true                                   // sandbox env
+	SERVER_PORT   = ":8383"
+	MERCHAND_ID   = "111111222222333333444444555555666666"                         // sellerport
+	SANDBOX       = true                                                           // sandbox env
+	USERNAME      = "user"                                                         // for authentication
+	PASSWORD_HASH = "$2a$10$q7OQK8cYUQLkpf3I8utM9eyVCxybLzRgLWz6hQf.hrwfXgA.4rk5S" // hashed password for authentication
 )
 
 func main() {
 	router := mux.NewRouter()
-	router.Methods("GET").Path("/Bank{price}").HandlerFunc(Bank)
-	router.Methods("GET").Path("/CallBack{price}").HandlerFunc(CallBack)
+	router.Methods("GET").Path("/Bank{price}").HandlerFunc(authenticate(Bank))
+	router.Methods("GET").Path("/CallBack{price}").HandlerFunc(authenticate(CallBack))
 	log.Fatal(http.ListenAndServe(SERVER_PORT, router))
 }
 
@@ -120,6 +123,24 @@ func CallBack(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Fprintln(w, "پرداخت موفقیت آمیز بود . شماره پیگیری : ", refId)
 	fmt.Println(w, "Payment Verified : ", verified, " ,  refId: ", refId, " statusCode: ", statusCode)
+}
+
+func authenticate(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		username, password, ok := r.BasicAuth()
+		if !ok || username != USERNAME || !CheckPasswordHash(password, PASSWORD_HASH) {
+			w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
+			w.WriteHeader(http.StatusUnauthorized)
+			fmt.Fprintf(w, "Unauthorized access.\n")
+			return
+		}
+		next.ServeHTTP(w, r)
+	}
+}
+
+func CheckPasswordHash(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
 }
 
 /*
