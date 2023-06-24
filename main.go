@@ -12,15 +12,13 @@ import (
 )
 
 // todo :
-// review code and review comments
-// optimize the code by comments
-// run and test on server
+// review code
 // add feature
 
 const (
 	SERVER_PORT = ":8383"
-	MERCHAND_ID = "111111222222333333444444555555666666"
-	SANDBOX     = true
+	MERCHAND_ID = "111111222222333333444444555555666666" // sellerport
+	SANDBOX     = true                                   // sandbox env
 )
 
 func main() {
@@ -31,7 +29,7 @@ func main() {
 }
 
 func Bank(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
+	vars := mux.Vars(r) // extract the "price" parameter from the URL
 	price, ok := vars["price"]
 
 	if !ok {
@@ -56,7 +54,7 @@ func Bank(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	paymentUrl, authority, statusCode, err := zarinpal.NewPaymentRequest(intPrice, "http://localhost"+SERVER_PORT+"/CallBack"+price, "پرداخت تست تاپ لرن", "", "")
+	paymentUrl, authority, statusCode, err := zarinpal.NewPaymentRequest(intPrice, "http://localhost"+SERVER_PORT+"/CallBack"+price, "پرداخت تست  توسط توسعه دهنده", "", "")
 
 	if err != nil {
 
@@ -75,7 +73,7 @@ func Bank(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("PaymentURL: ", paymentUrl, " statusCode : ", statusCode, " Authority: ", authority)
 
-	http.Redirect(w, r, paymentUrl, 302)
+	http.Redirect(w, r, paymentUrl, http.StatusFound)
 
 }
 
@@ -130,3 +128,9 @@ func CallBack(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println(w, "Payment Verified : ", verified, " ,  refId: ", refId, " statusCode: ", statusCode)
 }
+
+/*
+test :
+localhost:8383/Bank5000
+localhost:8383/callback5000
+*/
