@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"regexp"
 	"strconv"
 
 	"github.com/sinabakh/go-zarinpal-checkout"
@@ -40,16 +41,31 @@ func Bank(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	zarinpal, err := zarinpal.NewZarinpal(MERCHAND_ID, SANDBOX)
-
-	if err != nil {
-		http.Error(w, "خطا در پرداخت: خطای اتصال به Zarinpal", http.StatusInternalServerError)
+	// Validate the price input
+	match, _ := regexp.MatchString(`^[1-9]\d*$`, price)
+	if !match {
+		http.Error(w, "لطفا مبلغ را بصورت عدد وارد کنید.", http.StatusBadRequest)
 		return
 	}
 
 	intPrice, err := strconv.Atoi(price)
 	if err != nil {
 		http.Error(w, "لطفا مبلغ را بصورت عدد وارد کنید.", http.StatusBadRequest)
+		return
+	}
+
+	// Check if the price is within the allowed range
+	MAX_PAYMENT_AMOUNT := 1000000000
+	if intPrice > MAX_PAYMENT_AMOUNT || intPrice <= 0 {
+		http.Error(w, fmt.Sprintf("\u0645\u0628\u0644\u063a \u067e\u0631\u062f\u0627\u062e\u062a \u0646\u0627\u0645\u0639\u062a\u0628\u0631 \u0627\u0633\u062a. \u0645\u06cc\u200c\u0628\u0627\u06cc\u0633\u062a \u0628\u06cc\u0646 %d \u0648 %d \u0628\u0627\u0634\u062f.", 1, MAX_PAYMENT_AMOUNT), http.StatusBadRequest)
+
+		return
+	}
+
+	zarinpal, err := zarinpal.NewZarinpal(MERCHAND_ID, SANDBOX)
+
+	if err != nil {
+		http.Error(w, "خطا در پرداخت: خطای اتصال به Zarinpal", http.StatusInternalServerError)
 		return
 	}
 
@@ -67,7 +83,6 @@ func Bank(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("PaymentURL: ", paymentUrl, " statusCode : ", statusCode, " Authority: ", authority)
 
 	http.Redirect(w, r, paymentUrl, http.StatusFound)
-
 }
 
 func CallBack(w http.ResponseWriter, r *http.Request) {
