@@ -12,7 +12,7 @@ import (
 )
 
 // todo :
-// review code
+// review completly code code step by step
 // add feature
 
 const (
@@ -33,42 +33,32 @@ func Bank(w http.ResponseWriter, r *http.Request) {
 	price, ok := vars["price"]
 
 	if !ok {
-		fmt.Fprintln(w, "لطفا مبلغ را وارد کنید.")
-		w.WriteHeader(http.StatusBadRequest)
+		http.Error(w, "لطفا مبلغ را وارد کنید.", http.StatusBadRequest)
 		return
 	}
 
 	zarinpal, err := zarinpal.NewZarinpal(MERCHAND_ID, SANDBOX)
 
 	if err != nil {
-		fmt.Fprintln(w, "خطا در پرداخت.")
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "خطا در پرداخت: خطای اتصال به Zarinpal", http.StatusInternalServerError)
 		return
 	}
 
 	intPrice, err := strconv.Atoi(price)
 	if err != nil {
-
-		fmt.Fprintln(w, "لطفا مبلغ را بصورت عدد وارد کنید.")
-		w.WriteHeader(http.StatusBadRequest)
+		http.Error(w, "لطفا مبلغ را بصورت عدد وارد کنید.", http.StatusBadRequest)
 		return
 	}
 
 	paymentUrl, authority, statusCode, err := zarinpal.NewPaymentRequest(intPrice, "http://localhost"+SERVER_PORT+"/CallBack"+price, "پرداخت تست  توسط توسعه دهنده", "", "")
 
 	if err != nil {
-
 		if statusCode == -3 {
-
-			fmt.Fprintln(w, "مبلغ قابل پرداخت نیست.")
-			w.WriteHeader(http.StatusBadRequest)
+			http.Error(w, "خطا در پرداخت: مبلغ قابل پرداخت نیست", http.StatusBadRequest)
 			return
 		}
-
-		fmt.Fprintln(w, "خطایی در پرداخت رخ داده است")
-		w.WriteHeader(http.StatusBadRequest)
+		http.Error(w, "خطا در پرداخت: خطای سیستمی", http.StatusInternalServerError)
 		return
-
 	}
 
 	fmt.Println("PaymentURL: ", paymentUrl, " statusCode : ", statusCode, " Authority: ", authority)
@@ -79,53 +69,56 @@ func Bank(w http.ResponseWriter, r *http.Request) {
 
 func CallBack(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "برگشت از درگاه")
-
 	authority := r.URL.Query().Get("Authority")
 	status := r.URL.Query().Get("Status")
 
 	if authority == "" || status == "" || status != "OK" {
-		fmt.Fprintln(w, "خطایی در پرداخت رخ داده است")
-		w.WriteHeader(http.StatusOK)
-
+		http.Error(w, "خطایی در پرداخت رخ داده است", http.StatusBadRequest)
 		return
 	}
 
 	vars := mux.Vars(r)
 	price, ok := vars["price"]
 	if !ok {
-		fmt.Fprintln(w, "لطفا مبلغ را وارد کنید.")
-		w.WriteHeader(http.StatusBadRequest)
+		http.Error(w, "لطفا مبلغ را وارد کنید.", http.StatusBadRequest)
 		return
 	}
 	intPrice, err := strconv.Atoi(price)
 	if err != nil {
-		fmt.Fprintln(w, "لطفا مبلغ را بصورت عدد وارد کنید.")
-		w.WriteHeader(http.StatusBadRequest)
+		http.Error(w, "لطفا مبلغ را بصورت عدد وارد کنید.", http.StatusBadRequest)
 		return
 	}
 
 	zarinpal, err := zarinpal.NewZarinpal(MERCHAND_ID, SANDBOX)
 	if err != nil {
-		fmt.Fprintln(w, "خطا در پرداخت.")
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "خطا در ساخت شی Zarinpal", http.StatusInternalServerError)
 		return
 	}
 
 	verified, refId, statusCode, err := zarinpal.PaymentVerification(intPrice, authority)
 	if err != nil {
-		if statusCode == 101 {
-			fmt.Fprintln(w, "این پرداخت موفق بوده و قبلا این عملیات انجام شده است.")
-			w.WriteHeader(http.StatusOK)
+		switch statusCode {
+		case 101:
+			http.Error(w, "این پرداخت موفق بوده و قبلا این عملیات انجام شده است.", http.StatusOK)
+			return
+		case -21:
+			http.Error(w, "پرداخت توسط کاربر لغو شده است.", http.StatusNoContent)
+			return
+		case -22:
+			http.Error(w, "پرداخت انجام نشده است.", http.StatusNoContent)
+			return
+		default:
+			http.Error(w, "خطا در پرداخت", http.StatusInternalServerError)
 			return
 		}
+	}
 
-		fmt.Fprintln(w, "خطا در پرداخت.")
-		w.WriteHeader(http.StatusInternalServerError)
+	if !verified {
+		http.Error(w, "پرداخت تایید نشده است", http.StatusOK)
 		return
 	}
 
 	fmt.Fprintln(w, "پرداخت موفقیت آمیز بود . شماره پیگیری : ", refId)
-
 	fmt.Println(w, "Payment Verified : ", verified, " ,  refId: ", refId, " statusCode: ", statusCode)
 }
 
