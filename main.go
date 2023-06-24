@@ -13,9 +13,8 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// todo :
-// review completly code code step by step
-// add feature
+// final todo :
+// review completly code part by part and each part line by line
 
 const (
 	SERVER_PORT   = ":8383"
@@ -29,11 +28,18 @@ func main() {
 	router := mux.NewRouter()
 	router.Methods("GET").Path("/Bank{price}").HandlerFunc(authenticate(Bank))
 	router.Methods("GET").Path("/CallBack{price}").HandlerFunc(authenticate(CallBack))
+
+	// Set logging format
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
+	// Log server start
+	log.Println("Starting server on", SERVER_PORT)
+
 	log.Fatal(http.ListenAndServe(SERVER_PORT, router))
 }
 
 func Bank(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r) // extract the "price" parameter from the URL
+	vars := mux.Vars(r)
 	price, ok := vars["price"]
 
 	if !ok {
@@ -58,7 +64,6 @@ func Bank(w http.ResponseWriter, r *http.Request) {
 	MAX_PAYMENT_AMOUNT := 1000000000
 	if intPrice > MAX_PAYMENT_AMOUNT || intPrice <= 0 {
 		http.Error(w, fmt.Sprintf("\u0645\u0628\u0644\u063a \u067e\u0631\u062f\u0627\u062e\u062a \u0646\u0627\u0645\u0639\u062a\u0628\u0631 \u0627\u0633\u062a. \u0645\u06cc\u200c\u0628\u0627\u06cc\u0633\u062a \u0628\u06cc\u0646 %d \u0648 %d \u0628\u0627\u0634\u062f.", 1, MAX_PAYMENT_AMOUNT), http.StatusBadRequest)
-
 		return
 	}
 
@@ -69,7 +74,7 @@ func Bank(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	paymentUrl, authority, statusCode, err := zarinpal.NewPaymentRequest(intPrice, "http://localhost"+SERVER_PORT+"/CallBack"+price, "پرداخت تست  توسط توسعه دهنده", "", "")
+	paymentUrl, _, statusCode, err := zarinpal.NewPaymentRequest(intPrice, "http://localhost"+SERVER_PORT+"/CallBack"+price, "پرداخت تست  توسط توسعه دهنده", "", "")
 
 	if err != nil {
 		if statusCode == -3 {
@@ -80,7 +85,7 @@ func Bank(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("PaymentURL: ", paymentUrl, " statusCode : ", statusCode, " Authority: ", authority)
+	log.Println("Generated payment URL:", paymentUrl)
 
 	http.Redirect(w, r, paymentUrl, http.StatusFound)
 }
@@ -109,6 +114,7 @@ func CallBack(w http.ResponseWriter, r *http.Request) {
 
 	zarinpal, err := zarinpal.NewZarinpal(MERCHAND_ID, SANDBOX)
 	if err != nil {
+		log.Println("Error creating Zarinpal object:", err)
 		http.Error(w, "خطا در ساخت شی Zarinpal", http.StatusInternalServerError)
 		return
 	}
@@ -117,6 +123,7 @@ func CallBack(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch statusCode {
 		case 101:
+			log.Println("Payment already verified")
 			http.Error(w, "این پرداخت موفق بوده و قبلا این عملیات انجام شده است.", http.StatusOK)
 			return
 		case -21:
@@ -126,6 +133,7 @@ func CallBack(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "پرداخت انجام نشده است.", http.StatusNoContent)
 			return
 		default:
+			log.Println("Error verifying payment:", err)
 			http.Error(w, "خطا در پرداخت", http.StatusInternalServerError)
 			return
 		}
@@ -136,24 +144,24 @@ func CallBack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("Payment Verified: %v, refId: %s, statusCode: %d\n", verified, refId, statusCode)
+
 	fmt.Fprintln(w, "پرداخت موفقیت آمیز بود . شماره پیگیری : ", refId)
-	fmt.Println(w, "Payment Verified : ", verified, " ,  refId: ", refId, " statusCode: ", statusCode)
 }
 
 func authenticate(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		username, password, ok := r.BasicAuth()
-		if !ok || username != USERNAME || !CheckPasswordHash(password, PASSWORD_HASH) {
-			w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
-			w.WriteHeader(http.StatusUnauthorized)
-			fmt.Fprintf(w, "Unauthorized access.\n")
+		if !ok || username != USERNAME || !checkPasswordHash(password, PASSWORD_HASH) {
+			w.Header().Set("WWW-Authenticate", "Basic realm=Restricted")
+			http.Error(w, "Authentication failed", http.StatusUnauthorized)
 			return
 		}
-		next.ServeHTTP(w, r)
+		next(w, r)
 	}
 }
 
-func CheckPasswordHash(password, hash string) bool {
+func checkPasswordHash(password, hash string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 	return err == nil
 }
