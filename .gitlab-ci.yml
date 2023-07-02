@@ -1,0 +1,8 @@
+#  This file will define the pipeline configuration
+stages:
+  - test
+
+unit_test:
+  stage: test
+  script:
+    - go test -v ./...
