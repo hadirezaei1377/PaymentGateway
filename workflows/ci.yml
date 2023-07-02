@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main  
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.20.4
+
+      - name: Build and test
+        run: |
+          go build ./...
+          go test -v ./...
+
+
+env:
+  SERVER_PORT: ":8383"
+  MERCHAND_ID: "111111222222333333444444555555666666"
+  SANDBOX: true
+  USERNAME: "user"
+  PASSWORD_HASH: "$2a$10$q7OQK8cYUQLkpf3I8utM9eyVCxybLzRgLWz6hQf.hrwfXgA.4rk5S"
+
+- name: Build and test
+  run: |
+    go get -v ./...   # Install dependencies
+    go build ./...
+    go test -v ./...
+
